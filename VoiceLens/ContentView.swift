@@ -10,19 +10,24 @@ import SwiftData
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
+    @Query(sort: \VoiceEntry.timestamp, order: .reverse) private var entries: [VoiceEntry]
 
     var body: some View {
         NavigationSplitView {
             List {
-                ForEach(items) { item in
+                ForEach(entries) { entry in
                     NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(entry.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
+                            Text(entry.transcript)
+                            Text(entry.aiResponse)
+                            Text(entry.audioFileName)
+                        }
                     } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
+                        Text(entry.transcript.isEmpty ? entry.timestamp.formatted() : entry.transcript)
                     }
                 }
-                .onDelete(perform: deleteItems)
+                .onDelete(perform: deleteEntries)
             }
 #if os(macOS)
             .navigationSplitViewColumnWidth(min: 180, ideal: 200)
@@ -34,27 +39,27 @@ struct ContentView: View {
                 }
 #endif
                 ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
+                    Button(action: addEntry) {
+                        Label("Add Entry", systemImage: "plus")
                     }
                 }
             }
         } detail: {
-            Text("Select an item")
+            Text("Select an entry")
         }
     }
 
-    private func addItem() {
+    private func addEntry() {
         withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
+            let entry = VoiceEntry(transcript: "", aiResponse: "", audioFileName: "")
+            modelContext.insert(entry)
         }
     }
 
-    private func deleteItems(offsets: IndexSet) {
+    private func deleteEntries(offsets: IndexSet) {
         withAnimation {
             for index in offsets {
-                modelContext.delete(items[index])
+                modelContext.delete(entries[index])
             }
         }
     }
@@ -62,5 +67,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
+        .modelContainer(for: VoiceEntry.self, inMemory: true)
 }
