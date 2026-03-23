@@ -10,7 +10,7 @@ import Foundation
 import Observation
 
 struct OpenAIConfig {
-    static let apiKey = "YOUR_API_KEY_HERE"
+    static let apiKey = Secrets.openAIKey
 }
 
 @MainActor
@@ -114,8 +114,12 @@ final class AIService {
         }
     }
 
-    func speakResponse() {
+    func stopSpeaking() {
         speechSynthesizer.stopSpeaking(at: .immediate)
+    }
+
+    func speakResponse() {
+        stopSpeaking()
 
         let utterance = AVSpeechUtterance(string: responseText)
         utterance.rate = 0.5
