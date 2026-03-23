@@ -12,6 +12,7 @@ import SwiftUI
 struct RecorderView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var audioViewModel = AudioViewModel()
+    @State private var conversationViewModel = ConversationViewModel()
 
     @State private var recordButtonPulseScale: CGFloat = 1.0
 
@@ -27,6 +28,10 @@ struct RecorderView: View {
             recordSection
 
             transcriptSection
+
+            responseSection
+
+            stopSpeakingButton
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -43,6 +48,16 @@ struct RecorderView: View {
                 }
             } else {
                 recordButtonPulseScale = 1.0
+            }
+        }
+        .onChange(of: audioViewModel.recordingState) { _, newState in
+            guard newState == .done else { return }
+            guard !audioViewModel.transcript.isEmpty else { return }
+            Task {
+                await conversationViewModel.processTranscript(
+                    transcript: audioViewModel.transcript,
+                    modelContext: modelContext
+                )
             }
         }
     }
@@ -165,6 +180,56 @@ struct RecorderView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    @ViewBuilder
+    private var responseSection: some View {
+        let showResponse =
+            !conversationViewModel.currentResponse.isEmpty || conversationViewModel.isProcessing
+        if showResponse {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Response")
+                    .font(Font.caption.smallCaps())
+                    .foregroundStyle(.secondary)
+
+                Group {
+                    if conversationViewModel.isProcessing && conversationViewModel.currentResponse.isEmpty {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                            Text("Thinking...")
+                                .foregroundStyle(.white)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        ScrollView {
+                            Text(conversationViewModel.currentResponse)
+                                .font(.body)
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                }
+                .padding()
+                .background(Color(white: 0.15))
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    @ViewBuilder
+    private var stopSpeakingButton: some View {
+        if !conversationViewModel.isProcessing && !conversationViewModel.currentResponse.isEmpty {
+            Button("Stop Speaking") {
+                conversationViewModel.stopSpeaking()
+            }
+            .font(.caption)
+            .foregroundStyle(.white.opacity(0.85))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(Color.gray.opacity(0.35))
+            .clipShape(Capsule())
         }
     }
 }
