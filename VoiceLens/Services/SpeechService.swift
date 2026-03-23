@@ -30,6 +30,10 @@ final class SpeechService {
         speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
     }
 
+    func clearTranscript() {
+        transcript = ""
+    }
+
     nonisolated func requestPermission() {
         SFSpeechRecognizer.requestAuthorization { status in
             Task { @MainActor [weak self] in

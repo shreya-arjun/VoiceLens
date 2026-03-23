@@ -53,7 +53,7 @@ final class AudioRecorderService {
         #if os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.record, mode: .default, options: [])
+            try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
             try session.setActive(true)
         } catch {
             errorMessage = error.localizedDescription
@@ -63,6 +63,7 @@ final class AudioRecorderService {
 
         do {
             let newRecorder = try AVAudioRecorder(url: url, settings: Self.recordingSettings)
+            newRecorder.isMeteringEnabled = true
             newRecorder.prepareToRecord()
             guard newRecorder.record() else {
                 errorMessage = "Could not start audio recording."
@@ -89,6 +90,22 @@ final class AudioRecorderService {
         deactivateSession()
 
         recordingURL = Self.outputFileURL
+    }
+
+    /// Normalized input level (0–1) from `averagePower` metering while recording.
+    func normalizedMeterLevel() -> Float {
+        guard let recorder, recorder.isMeteringEnabled else { return 0 }
+        recorder.updateMeters()
+        let db = recorder.averagePower(forChannel: 0)
+        return Self.dbToNormalized(db)
+    }
+
+    private static func dbToNormalized(_ db: Float) -> Float {
+        let silence: Float = -80
+        let maxDb: Float = 0
+        if db <= silence { return 0 }
+        if db >= maxDb { return 1 }
+        return (db - silence) / (maxDb - silence)
     }
 
     func deleteRecording() {
