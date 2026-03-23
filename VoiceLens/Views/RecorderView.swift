@@ -6,6 +6,7 @@
 //
 
 import AVFoundation
+import SwiftData
 import SwiftUI
 
 struct RecorderView: View {
@@ -31,6 +32,7 @@ struct RecorderView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(white: 0.08))
         .task {
+            _ = modelContext
             await requestMicrophonePermissionIfNeeded()
         }
         .onChange(of: audioViewModel.recordingState) { _, newState in
@@ -63,31 +65,36 @@ struct RecorderView: View {
     }
 
     private var waveformSection: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: audioViewModel.recordingState != .recording)) { timeline in
-            let phase = timeline.date.timeIntervalSinceReferenceDate
-            let isRecording = audioViewModel.recordingState == .recording
-            let level = CGFloat(audioViewModel.audioLevel)
+        let paused = audioViewModel.recordingState != .recording
+        let level = audioViewModel.audioLevel
 
+        return TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: paused)) { timeline in
             HStack(spacing: 6) {
                 ForEach(0 ..< 20, id: \.self) { index in
-                    let pseudoRandom = abs(sin(phase * 3.0 + Double(index) * 1.73 + Double(index) * 0.41))
-                    let height: CGFloat = {
-                        if isRecording {
-                            let base = max(4, level * waveformMaxHeight * CGFloat(0.35 + 0.65 * pseudoRandom))
-                            return min(waveformMaxHeight, base)
-                        } else {
-                            return 4
-                        }
-                    }()
-
-                    RoundedRectangle(cornerRadius: 3, style: .continuous)
-                        .fill(Color.accentColor)
-                        .frame(height: height)
-                        .frame(maxWidth: .infinity)
+                    waveformBar(index: index, audioLevel: level, date: timeline.date)
                 }
             }
             .frame(maxHeight: waveformMaxHeight, alignment: .bottom)
         }
+    }
+
+    private func barHeight(index: Int, audioLevel: Float, date: Date) -> CGFloat {
+        guard audioViewModel.recordingState == .recording else {
+            return 4
+        }
+
+        let phase = date.timeIntervalSinceReferenceDate
+        let level = CGFloat(audioLevel)
+        let pseudoRandom = abs(sin(phase * 3.0 + Double(index) * 1.73 + Double(index) * 0.41))
+        let base = max(4, level * waveformMaxHeight * CGFloat(0.35 + 0.65 * pseudoRandom))
+        return min(waveformMaxHeight, base)
+    }
+
+    private func waveformBar(index: Int, audioLevel: Float, date: Date) -> some View {
+        RoundedRectangle(cornerRadius: 3, style: .continuous)
+            .fill(Color.accentColor)
+            .frame(height: barHeight(index: index, audioLevel: audioLevel, date: date))
+            .frame(maxWidth: .infinity)
     }
 
     private var recordSection: some View {
@@ -95,7 +102,7 @@ struct RecorderView: View {
             Button {
                 let state = audioViewModel.recordingState
                 if state == .idle || state == .done {
-                    Task { await audioViewModel.startRecording() }
+                    Task { audioViewModel.startRecording() }
                 } else if state == .recording {
                     Task { await audioViewModel.stopRecording() }
                 }
@@ -144,7 +151,7 @@ struct RecorderView: View {
         if !audioViewModel.transcript.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Transcript")
-                    .font(.caption.smallCaps())
+                    .font(Font.caption.smallCaps())
                     .foregroundStyle(.secondary)
 
                 ScrollView {
